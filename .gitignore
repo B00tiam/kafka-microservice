@@ -30,3 +30,6 @@ replay_pid*
 **/*.ipr
 **/.vscode/
 
+# docker files
+docker-compose.yaml
+
