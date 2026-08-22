@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: order-service
+
+  datasource:
+      url: ${DATABASE_URL}
+      username: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.LongSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+
+    streams:
+      application-id: order-service-streams
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
