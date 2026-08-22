@@ -31,5 +31,8 @@ replay_pid*
 **/.vscode/
 
 # docker files
-docker-compose.yaml
+**/docker-compose.yaml
+
+# config files
+**/application.yaml
 
