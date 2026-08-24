@@ -1,6 +1,7 @@
 package self.dev.order.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+
 import self.dev.order.domain.Order;
 
 

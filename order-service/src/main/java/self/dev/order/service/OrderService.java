@@ -2,11 +2,14 @@ package self.dev.order.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
 import self.dev.order.domain.Order;
 import self.dev.order.repository.OrderRepository;
+import self.dev.domain.enums.OrderStatus;
 import self.dev.domain.event.OrderEvent;
 
 
@@ -48,12 +51,18 @@ public class OrderService {
         return orderRepository.findById(orderId);
     }
 
+    // Receive final order results from payment service and update the order status accordingly
+    @KafkaListener(topics = ORDERS_TOPIC, groupId = "order-service-results")
+    @Transactional
     public void updateResult(OrderEvent event) {
+
+        if (event.getStatus() != OrderStatus.CONFIRMED && event.getStatus() != OrderStatus.CANCELLED) {
+            return;
+        }
+
         Order order = orderRepository.findById(event.getOrderId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Order not found: " + event.getOrderId()
-                        )
+                        new IllegalArgumentException("Order not found: " + event.getOrderId())
                 );
 
         order.setStatus(event.getStatus());
