@@ -1,9 +1,9 @@
 spring:
   application:
-    name: payment-service
+    name: inventory-service
 
   datasource:
-    url: ${PAYMENT_DATABASE_URL}
+    url: ${INVENTORY_DATABASE_URL}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
 
@@ -16,7 +16,7 @@ spring:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
 
     consumer:
-      group-id: payment-service
+      group-id: inventory-service
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.LongDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
