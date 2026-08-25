@@ -1,4 +1,9 @@
 package self.dev.inventory.repository;
 
-public interface StockRepository {
+import self.dev.inventory.domain.Stock;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+
+public interface StockRepository extends JpaRepository<Stock, String> {
 }
