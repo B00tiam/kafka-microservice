@@ -10,6 +10,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import self.dev.domain.enums.OrderStatus;
 import self.dev.domain.enums.PaymentStatus;
@@ -21,7 +22,7 @@ import self.dev.payment.repository.PaymentRepository;
 
 
 @Import(TestcontainersConfiguration.class)
-@SpringBootTest
+@SpringBootTest(classes = PaymentServiceApplication.class)
 class PaymentIntegrationTest {
 
     @Autowired
@@ -60,10 +61,11 @@ class PaymentIntegrationTest {
         kafkaTemplate.send("orders", orderId, created);
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
-            Payment payment = paymentRepository
-                    .findByOrderId(orderId)
-                    .orElseThrow();
+            var paymentOptional = paymentRepository.findByOrderId(orderId);
 
+            assertTrue(paymentOptional.isPresent());
+
+            Payment payment = paymentOptional.get();
             Account account = accountRepository
                     .findById("customer-1")
                     .orElseThrow();

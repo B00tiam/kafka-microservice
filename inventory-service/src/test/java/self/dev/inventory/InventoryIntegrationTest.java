@@ -10,6 +10,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import self.dev.domain.enums.InventoryStatus;
 import self.dev.domain.enums.OrderStatus;
@@ -21,7 +22,7 @@ import self.dev.inventory.repository.StockRepository;
 
 
 @Import(TestcontainersConfiguration.class)
-@SpringBootTest
+@SpringBootTest(classes = InventoryServiceApplication.class)
 class InventoryIntegrationTest {
 
     @Autowired
@@ -59,10 +60,11 @@ class InventoryIntegrationTest {
         kafkaTemplate.send("orders", orderId, created);
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
-            Inventory inventory = inventoryRepository
-                    .findByOrderId(orderId)
-                    .orElseThrow();
+            var inventoryOptional = inventoryRepository.findByOrderId(orderId);
 
+            assertTrue(inventoryOptional.isPresent());
+
+            Inventory inventory = inventoryOptional.get();
             Stock stock = stockRepository
                     .findById("product-1")
                     .orElseThrow();
