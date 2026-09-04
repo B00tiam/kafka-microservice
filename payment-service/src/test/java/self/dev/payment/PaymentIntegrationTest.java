@@ -103,4 +103,146 @@ class PaymentIntegrationTest {
             assertEquals(0.0, account.getReservedBalance());
         });
     }
+
+    @Test
+    void shouldRejectPaymentWhenBalanceIsInsufficient() {
+        long orderId = 1002L;
+
+        kafkaTemplate.send(
+                "orders",
+                orderId,
+                paymentEvent(orderId, OrderStatus.CREATED, 130.0)
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var paymentOptional =
+                    paymentRepository.findByOrderId(orderId);
+
+            assertTrue(paymentOptional.isPresent());
+
+            Payment payment = paymentOptional.get();
+            Account account = accountRepository
+                    .findById("customer-1")
+                    .orElseThrow();
+
+            assertEquals(
+                    PaymentStatus.RESERVATION_FAILED,
+                    payment.getStatus()
+            );
+            assertEquals("Insufficient balance", payment.getReason());
+            assertEquals(100.0, account.getAvailableBalance());
+            assertEquals(0.0, account.getReservedBalance());
+        });
+    }
+
+    @Test
+    void shouldCancelAndReleaseReservedPayment() {
+        long orderId = 1003L;
+
+        kafkaTemplate.send(
+                "orders",
+                orderId,
+                paymentEvent(orderId, OrderStatus.CREATED, 30.0)
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var paymentOptional =
+                    paymentRepository.findByOrderId(orderId);
+
+            assertTrue(paymentOptional.isPresent());
+            assertEquals(
+                    PaymentStatus.RESERVATION_SUCCESS,
+                    paymentOptional.get().getStatus()
+            );
+        });
+
+        kafkaTemplate.send(
+                "orders",
+                orderId,
+                paymentEvent(orderId, OrderStatus.CANCELLED, 30.0)
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var paymentOptional =
+                    paymentRepository.findByOrderId(orderId);
+
+            assertTrue(paymentOptional.isPresent());
+
+            Account account = accountRepository
+                    .findById("customer-1")
+                    .orElseThrow();
+
+            assertEquals(
+                    PaymentStatus.CANCELLED,
+                    paymentOptional.get().getStatus()
+            );
+            assertEquals(100.0, account.getAvailableBalance());
+            assertEquals(0.0, account.getReservedBalance());
+        });
+    }
+
+    @Test
+    void shouldNotReserveTwiceWhenCreatedEventIsDuplicated() {
+        long orderId = 1004L;
+        OrderEvent created =
+                paymentEvent(orderId, OrderStatus.CREATED, 30.0);
+
+        kafkaTemplate.send("orders", orderId, created);
+        kafkaTemplate.send("orders", orderId, created);
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var paymentOptional =
+                    paymentRepository.findByOrderId(orderId);
+
+            assertTrue(paymentOptional.isPresent());
+            assertEquals(
+                    PaymentStatus.RESERVATION_SUCCESS,
+                    paymentOptional.get().getStatus()
+            );
+        });
+
+        /*
+         * 3 messages are sent with the same Kafka key, so they will be processed in order.
+         * When CANCELLED is processed, the two previous CREATED events have already been processed.
+         */
+        kafkaTemplate.send(
+                "orders",
+                orderId,
+                paymentEvent(orderId, OrderStatus.CANCELLED, 30.0)
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var paymentOptional =
+                    paymentRepository.findByOrderId(orderId);
+
+            assertTrue(paymentOptional.isPresent());
+
+            Account account = accountRepository
+                    .findById("customer-1")
+                    .orElseThrow();
+
+            assertEquals(1, paymentRepository.count());
+            assertEquals(
+                    PaymentStatus.CANCELLED,
+                    paymentOptional.get().getStatus()
+            );
+            assertEquals(100.0, account.getAvailableBalance());
+            assertEquals(0.0, account.getReservedBalance());
+        });
+    }
+
+    private OrderEvent paymentEvent(
+            long orderId,
+            OrderStatus status,
+            double amount) {
+
+        return new OrderEvent(
+                orderId,
+                "customer-1",
+                status,
+                "product-1",
+                2,
+                amount
+        );
+    }
 }
