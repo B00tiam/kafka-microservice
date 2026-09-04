@@ -105,4 +105,142 @@ class InventoryIntegrationTest {
             assertEquals(0, stock.getReservedStock());
         });
     }
+
+    @Test
+    void shouldRejectInventoryWhenStockIsInsufficient() {
+        long orderId = 2002L;
+
+        kafkaTemplate.send(
+                "orders",
+                orderId,
+                inventoryEvent(orderId, OrderStatus.CREATED, 130)
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var inventoryOptional =
+                    inventoryRepository.findByOrderId(orderId);
+
+            assertTrue(inventoryOptional.isPresent());
+
+            Inventory inventory = inventoryOptional.get();
+            Stock stock = stockRepository
+                    .findById("product-1")
+                    .orElseThrow();
+
+            assertEquals(
+                    InventoryStatus.RESERVATION_FAILED,
+                    inventory.getStatus()
+            );
+            assertEquals("Insufficient stock", inventory.getReason());
+            assertEquals(100, stock.getAvailableStock());
+            assertEquals(0, stock.getReservedStock());
+        });
+    }
+
+    @Test
+    void shouldCancelAndReleaseReservedInventory() {
+        long orderId = 2003L;
+
+        kafkaTemplate.send(
+                "orders",
+                orderId,
+                inventoryEvent(orderId, OrderStatus.CREATED, 3)
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var inventoryOptional =
+                    inventoryRepository.findByOrderId(orderId);
+
+            assertTrue(inventoryOptional.isPresent());
+            assertEquals(
+                    InventoryStatus.RESERVATION_SUCCESS,
+                    inventoryOptional.get().getStatus()
+            );
+        });
+
+        kafkaTemplate.send(
+                "orders",
+                orderId,
+                inventoryEvent(orderId, OrderStatus.CANCELLED, 3)
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var inventoryOptional =
+                    inventoryRepository.findByOrderId(orderId);
+
+            assertTrue(inventoryOptional.isPresent());
+
+            Stock stock = stockRepository
+                    .findById("product-1")
+                    .orElseThrow();
+
+            assertEquals(
+                    InventoryStatus.CANCELLED,
+                    inventoryOptional.get().getStatus()
+            );
+            assertEquals(100, stock.getAvailableStock());
+            assertEquals(0, stock.getReservedStock());
+        });
+    }
+
+    @Test
+    void shouldNotReserveTwiceWhenCreatedEventIsDuplicated() {
+        long orderId = 2004L;
+        OrderEvent created =
+                inventoryEvent(orderId, OrderStatus.CREATED, 3);
+
+        kafkaTemplate.send("orders", orderId, created);
+        kafkaTemplate.send("orders", orderId, created);
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var inventoryOptional =
+                    inventoryRepository.findByOrderId(orderId);
+
+            assertTrue(inventoryOptional.isPresent());
+            assertEquals(
+                    InventoryStatus.RESERVATION_SUCCESS,
+                    inventoryOptional.get().getStatus()
+            );
+        });
+
+        kafkaTemplate.send(
+                "orders",
+                orderId,
+                inventoryEvent(orderId, OrderStatus.CANCELLED, 3)
+        );
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            var inventoryOptional =
+                    inventoryRepository.findByOrderId(orderId);
+
+            assertTrue(inventoryOptional.isPresent());
+
+            Stock stock = stockRepository
+                    .findById("product-1")
+                    .orElseThrow();
+
+            assertEquals(1, inventoryRepository.count());
+            assertEquals(
+                    InventoryStatus.CANCELLED,
+                    inventoryOptional.get().getStatus()
+            );
+            assertEquals(100, stock.getAvailableStock());
+            assertEquals(0, stock.getReservedStock());
+        });
+    }
+
+    private OrderEvent inventoryEvent(
+            long orderId,
+            OrderStatus status,
+            int quantity) {
+
+        return new OrderEvent(
+                orderId,
+                "customer-1",
+                status,
+                "product-1",
+                quantity,
+                30.0
+        );
+    }
 }
