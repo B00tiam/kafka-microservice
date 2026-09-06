@@ -19,6 +19,7 @@
         <module>inventory-service</module>
         <module>notification-service</module>
         <module>base-domain</module>
+        <module>saga-tests</module>
     </modules>
 
     <properties>

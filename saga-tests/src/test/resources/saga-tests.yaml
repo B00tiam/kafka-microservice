@@ -1,0 +1,42 @@
+spring:
+  main:
+    banner-mode: "off"
+
+  jmx:
+    enabled: false
+
+  flyway:
+    enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+  kafka:
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.LongDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      properties:
+        "[spring.json.trusted.packages]": self.dev.domain.event
+        "[spring.json.value.default.type]": self.dev.domain.event.OrderEvent
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.LongSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+
+    streams:
+      replication-factor: 1
+
+    admin:
+      fail-fast: true
+
+server:
+  port: 0
+
+logging:
+  level:
+    org.apache.kafka: WARN
+    org.hibernate: WARN
